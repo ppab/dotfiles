@@ -1,0 +1,95 @@
+#!/bin/bash
+set -e
+
+# Defaults
+BASE_DIR="$HOME/notes"
+EDITOR="${EDITOR:-nvim}"
+CURRENT_DATE=$(date +"%Y-%m-%d")
+
+USE_CWD=false
+CUSTOM_PATH=""
+NOTE_NAME=""
+
+print_help() {
+  cat <<EOF
+Usage: note [options] <note-name>
+
+Options:
+  -c              Create note in current working directory
+  -p <path>       Create note in a custom path (relative or absolute)
+  -h              Show help
+
+Examples:
+  note feature/new-dashboard       → ~/notes/feature/new-dashboard.md
+  note -c quick-log                → ./quick-log.md
+  note -p ./docs/cli-overview      → ./docs/cli-overview.md
+
+All flags can be passed in any order.
+EOF
+}
+
+# Parse all arguments
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -c)
+      USE_CWD=true
+      shift
+      ;;
+    -p)
+      CUSTOM_PATH="$2"
+      shift 2
+      ;;
+    -h)
+      print_help
+      exit 0
+      ;;
+    -*)
+      echo "❌ Unknown option: $1"
+      print_help
+      exit 1
+      ;;
+    *)
+      NOTE_NAME="$1"
+      shift
+      ;;
+  esac
+done
+
+# Validate required input
+if [ -z "$NOTE_NAME" ]; then
+  echo "❌ Error: Missing note name"
+  print_help
+  exit 1
+fi
+
+# Determine output path
+if [ -n "$CUSTOM_PATH" ]; then
+  FILE_PATH="${CUSTOM_PATH}.md"
+elif [ "$USE_CWD" = true ]; then
+  FILE_PATH="./${NOTE_NAME}.md"
+else
+  FILE_PATH="$BASE_DIR/${NOTE_NAME}.md"
+fi
+
+mkdir -p "$(dirname "$FILE_PATH")"
+
+# Create file or notify
+if [ -f "$FILE_PATH" ]; then
+  echo "📄 Note already exists: $FILE_PATH"
+else
+  TITLE=$(basename "$NOTE_NAME" | sed -E 's/[-_]/ /g' | awk '{ for (i=1; i<=NF; ++i) $i=toupper(substr($i,1,1)) substr($i,2) } 1')
+  cat <<EOF > "$FILE_PATH"
+---
+title: $TITLE
+date: $CURRENT_DATE
+tags: []
+---
+
+# $TITLE
+EOF
+  echo "✅ Note created: $FILE_PATH"
+fi
+
+# Open it
+$EDITOR "$FILE_PATH"
+
