@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# usage:
+#   soure-env [env-file] <command> [args...]
+#   soure-env [env-file] --print
+#
+# Default env-file: ".env"
+
+set -euo pipefail
+
+# If first argument is a file, use it. Otherwise default to ".env"
+if [ $# -ge 1 ] && [ -f "$1" ]; then
+  ENV_FILE=$1
+  shift
+else
+  ENV_FILE=".env"
+fi
+
+if [ ! -f "$ENV_FILE" ]; then
+  echo "❌ Env file not found: $ENV_FILE"
+  exit 1
+fi
+
+(
+  set -a
+  # shellcheck source=/dev/null
+  source "$ENV_FILE"
+  set +a
+
+  if [ $# -ge 1 ] && [ "$1" = "--print" ]; then
+    # Print all env vars defined in the file (sorted, no duplicates)
+    while IFS='=' read -r key _; do
+      # skip comments and empty lines
+      if [[ -n "$key" && "$key" != \#* ]]; then
+        echo "$key=${!key}"
+      fi
+    done < "$ENV_FILE" | sort
+  else
+    exec "$@"
+  fi
+)
+
