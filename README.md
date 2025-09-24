@@ -1,4 +1,4 @@
-This repository is for centralizing scripts and config files.
+## This repository is for centralizing scripts and config files.
 
 
 ```text

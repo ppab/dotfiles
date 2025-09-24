@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# list-branches.sh
+# Show local branches with last commit date, author, and message
+
+git for-each-ref --sort=-committerdate refs/heads/ \
+  --format='%(refname:short) | %(committerdate:short) | %(authorname) | %(subject)'

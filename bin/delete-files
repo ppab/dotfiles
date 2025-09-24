@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# delete-files: recursively delete files of given types (with confirmation)
+# Usage:
+#   delete-files --type js
+#   delete-files --type js,ts,jsx
+#   delete-files --type js --type ts
+
+EXTS=()
+
+usage() {
+  echo "Usage: delete-files --type <ext>[,<ext>...] [--type <ext> ...]"
+  exit 1
+}
+
+# Parse args
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+  --type)
+    shift || usage
+    IFS=',' read -r -a parts <<<"${1:-}"
+    for p in "${parts[@]}"; do
+      [[ -n "${p// /}" ]] && EXTS+=("${p#.}") # strip leading dot if present
+    done
+    ;;
+  -*)
+    echo "Unknown option: $1" >&2
+    usage
+    ;;
+  *)
+    echo "Unknown argument: $1" >&2
+    usage
+    ;;
+  esac
+  shift || true
+done
+
+[[ ${#EXTS[@]} -eq 0 ]] && usage
+
+# Build the find predicate: \( -name "*.js" -o -name "*.ts" \)
+name_predicates=()
+for ext in "${EXTS[@]}"; do
+  name_predicates+=(-name "*.${ext}" -o)
+done
+unset 'name_predicates[${#name_predicates[@]}-1]' # remove trailing -o
+
+# Preview files
+echo "Searching for files with extensions: ${EXTS[*]} ..."
+FILES=$(find . -type f \( "${name_predicates[@]}" \))
+
+if [[ -z "$FILES" ]]; then
+  echo "No files found."
+  exit 0
+fi
+
+COUNT=$(echo "$FILES" | wc -l | tr -d ' ')
+echo "The following $COUNT file(s) would be deleted:"
+echo "$FILES"
+
+echo
+read -r -p "Delete these $COUNT file(s)? [y/N] " reply
+case "$reply" in
+y | Y | yes | YES)
+  # Use find + xargs to delete safely (handles spaces/newlines)
+  find . -type f \( "${name_predicates[@]}" \) -print0 | xargs -0 rm -v
+  echo "Done."
+  ;;
+*)
+  echo "Aborted. No files were deleted."
+  ;;
+esac

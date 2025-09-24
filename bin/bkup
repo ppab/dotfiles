@@ -1,0 +1,64 @@
+#!/bin/bash
+
+usage() {
+  echo "Usage: bkup [-z] <file-or-directory>"
+  echo "  -z   Compress directory backups into a .tar.gz archive"
+  exit 1
+}
+
+# Parse flags
+compress=false
+while getopts ":z" opt; do
+  case $opt in
+  z) compress=true ;;
+  *) usage ;;
+  esac
+done
+shift $((OPTIND - 1))
+
+# Check if a filename or directory was provided
+if [ -z "$1" ]; then
+  usage
+fi
+
+target="$1"
+
+# Check existence
+if [ ! -e "$target" ]; then
+  echo "Error: '$target' does not exist."
+  exit 1
+fi
+
+# Extract base info
+base=$(basename -- "$target")
+timestamp=$(date +"%Y%m%d_%H%M%S")
+
+if [ -f "$target" ]; then
+  extension="${base##*.}"
+  name="${base%.*}"
+
+  # If no extension (filename == name)
+  if [ "$name" = "$base" ]; then
+    extension=""
+  fi
+
+  if [ -n "$extension" ]; then
+    backup="${name}.backup_${timestamp}.${extension}"
+  else
+    backup="${name}.backup_${timestamp}"
+  fi
+
+  cp "$target" "$backup"
+  echo "File backup created: $backup"
+
+elif [ -d "$target" ]; then
+  if $compress; then
+    backup="${base}.backup_${timestamp}.tar.gz"
+    tar -czf "$backup" "$target"
+    echo "Directory backup created (compressed): $backup"
+  else
+    backup="${base}.backup_${timestamp}"
+    cp -r "$target" "$backup"
+    echo "Directory backup created: $backup"
+  fi
+fi
