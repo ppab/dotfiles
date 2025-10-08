@@ -1,0 +1,150 @@
+#!/bin/bash
+
+# AWS ACM Certificate Import Script
+# Imports VPN certificates to AWS Certificate Manager
+
+set -e
+
+# Default values
+REGION="us-west-1"
+CA_CERT="ca.crt"
+SERVER_CERT="server.crt"
+SERVER_KEY="server.key"
+CLIENT_CERT="client.crt"
+CLIENT_KEY="client.key"
+
+# Parse command line arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --region)
+            REGION="$2"
+            shift 2
+            ;;
+        --ca-cert)
+            CA_CERT="$2"
+            shift 2
+            ;;
+        --server-cert)
+            SERVER_CERT="$2"
+            shift 2
+            ;;
+        --server-key)
+            SERVER_KEY="$2"
+            shift 2
+            ;;
+        --client-cert)
+            CLIENT_CERT="$2"
+            shift 2
+            ;;
+        --client-key)
+            CLIENT_KEY="$2"
+            shift 2
+            ;;
+        --help)
+            echo "Usage: $0 [OPTIONS]"
+            echo "Options:"
+            echo "  --region REGION      AWS region (default: us-west-1)"
+            echo "  --ca-cert FILE       CA certificate file (default: ca.crt)"
+            echo "  --server-cert FILE   Server certificate file (default: server.crt)"
+            echo "  --server-key FILE    Server private key file (default: server.key)"
+            echo "  --client-cert FILE   Client certificate file (default: client.crt)"
+            echo "  --client-key FILE    Client private key file (default: client.key)"
+            echo "  --help              Show this help message"
+            echo
+            echo "Prerequisites:"
+            echo "  - AWS CLI installed and configured"
+            echo "  - Proper IAM permissions for ACM operations"
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1"
+            echo "Use --help for usage information"
+            exit 1
+            ;;
+    esac
+done
+
+# Check if AWS CLI is installed
+if ! command -v aws &> /dev/null; then
+    echo "Error: AWS CLI is not installed. Please install it first."
+    echo "Visit: https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html"
+    exit 1
+fi
+
+# Check if required files exist
+for file in "$CA_CERT" "$SERVER_CERT" "$SERVER_KEY" "$CLIENT_CERT" "$CLIENT_KEY"; do
+    if [[ ! -f "$file" ]]; then
+        echo "Error: Required file '$file' not found."
+        echo "Make sure you've generated the certificates first using generate-vpn-certs.sh"
+        exit 1
+    fi
+done
+
+echo "=== AWS ACM Certificate Import ==="
+echo "Region: $REGION"
+echo "CA Certificate: $CA_CERT"
+echo "Server Certificate: $SERVER_CERT"
+echo "Client Certificate: $CLIENT_CERT"
+echo
+
+# Check AWS credentials
+echo "Checking AWS credentials..."
+if ! aws sts get-caller-identity --region "$REGION" &>/dev/null; then
+    echo "Error: AWS credentials not configured or invalid."
+    echo "Run 'aws configure' to set up your credentials."
+    exit 1
+fi
+echo "✓ AWS credentials verified"
+
+# Import Server Certificate
+echo "Importing Server Certificate to ACM..."
+SERVER_ARN=$(aws acm import-certificate \
+    --region "$REGION" \
+    --certificate fileb://"$SERVER_CERT" \
+    --private-key fileb://"$SERVER_KEY" \
+    --certificate-chain fileb://"$CA_CERT" \
+    --query 'CertificateArn' \
+    --output text)
+
+if [[ $? -eq 0 ]]; then
+    echo "✓ Server certificate imported successfully"
+    echo "  ARN: $SERVER_ARN"
+else
+    echo "✗ Failed to import server certificate"
+    exit 1
+fi
+
+# Import Client Certificate
+echo "Importing Client Certificate to ACM..."
+CLIENT_ARN=$(aws acm import-certificate \
+    --region "$REGION" \
+    --certificate fileb://"$CLIENT_CERT" \
+    --private-key fileb://"$CLIENT_KEY" \
+    --certificate-chain fileb://"$CA_CERT" \
+    --query 'CertificateArn' \
+    --output text)
+
+if [[ $? -eq 0 ]]; then
+    echo "✓ Client certificate imported successfully"
+    echo "  ARN: $CLIENT_ARN"
+else
+    echo "✗ Failed to import client certificate"
+    exit 1
+fi
+
+echo
+echo "=== Import Complete ==="
+echo "Server Certificate ARN: $SERVER_ARN"
+echo "Client Certificate ARN: $CLIENT_ARN"
+echo
+echo "Next steps for AWS ClientVPN:"
+echo "1. Create ClientVPN Endpoint using Server Certificate ARN"
+echo "2. Associate Client Certificate ARN for client authentication"
+echo "3. Configure authorization rules and target networks"
+echo
+echo "AWS CLI example:"
+echo "aws ec2 create-client-vpn-endpoint \\"
+echo "  --client-cidr-block 10.0.0.0/16 \\"
+echo "  --server-certificate-arn $SERVER_ARN \\"
+echo "  --authentication-options Type=certificate-authentication,MutualAuthentication.ClientCertificateArn=$CLIENT_ARN \\"
+echo "  --connection-log-options Enabled=false"

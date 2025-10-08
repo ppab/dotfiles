@@ -1,0 +1,124 @@
+#!/bin/bash
+
+# AWS ClientVPN Certificate Generator
+# This script creates a proper PKI structure for AWS ClientVPN
+
+set -e
+
+# Default values
+CA_NAME="VPN-CA"
+SERVER_NAME="vpn-server"
+CLIENT_NAME="client1"
+DAYS=365
+
+# Parse command line arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --ca-name)
+            CA_NAME="$2"
+            shift 2
+            ;;
+        --server-name)
+            SERVER_NAME="$2"
+            shift 2
+            ;;
+        --client-name)
+            CLIENT_NAME="$2"
+            shift 2
+            ;;
+        --days)
+            DAYS="$2"
+            shift 2
+            ;;
+        --help)
+            echo "Usage: $0 [OPTIONS]"
+            echo "Options:"
+            echo "  --ca-name NAME       CA certificate name (default: VPN-CA)"
+            echo "  --server-name NAME   Server certificate name (default: vpn-server)"
+            echo "  --client-name NAME   Client certificate name (default: client1)"
+            echo "  --days DAYS          Certificate validity in days (default: 365)"
+            echo "  --help              Show this help message"
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1"
+            echo "Use --help for usage information"
+            exit 1
+            ;;
+    esac
+done
+
+echo "=== AWS ClientVPN Certificate Generator ==="
+echo "CA Name: $CA_NAME"
+echo "Server Name: $SERVER_NAME"
+echo "Client Name: $CLIENT_NAME"
+echo "Validity: $DAYS days"
+echo
+
+# Step 1: Create Certificate Authority (CA)
+echo "Step 1: Creating Certificate Authority..."
+openssl req -new -x509 -days $DAYS -nodes \
+    -keyout ca.key \
+    -out ca.crt \
+    -subj "/CN=$CA_NAME"
+echo "✓ CA certificate created: ca.crt, ca.key"
+
+# Step 2: Create Server Certificate
+echo "Step 2: Creating Server Certificate..."
+openssl req -new -nodes \
+    -keyout server.key \
+    -out server.csr \
+    -subj "/CN=$SERVER_NAME"
+
+openssl x509 -req -in server.csr \
+    -CA ca.crt \
+    -CAkey ca.key \
+    -out server.crt \
+    -days $DAYS \
+    -CAcreateserial
+echo "✓ Server certificate created: server.crt, server.key"
+
+# Step 3: Create Client Certificate
+echo "Step 3: Creating Client Certificate..."
+openssl req -new -nodes \
+    -keyout client.key \
+    -out client.csr \
+    -subj "/CN=$CLIENT_NAME"
+
+openssl x509 -req -in client.csr \
+    -CA ca.crt \
+    -CAkey ca.key \
+    -out client.crt \
+    -days $DAYS
+echo "✓ Client certificate created: client.crt, client.key"
+
+# Step 4: Verify certificates
+echo "Step 4: Verifying certificates..."
+if openssl verify -CAfile ca.crt server.crt >/dev/null 2>&1; then
+    echo "✓ Server certificate verification: PASSED"
+else
+    echo "✗ Server certificate verification: FAILED"
+    exit 1
+fi
+
+if openssl verify -CAfile ca.crt client.crt >/dev/null 2>&1; then
+    echo "✓ Client certificate verification: PASSED"
+else
+    echo "✗ Client certificate verification: FAILED"
+    exit 1
+fi
+
+# Clean up CSR files
+rm -f server.csr client.csr
+
+echo
+echo "=== Certificate Generation Complete ==="
+echo "Files created:"
+echo "  CA:     ca.crt, ca.key"
+echo "  Server: server.crt, server.key"  
+echo "  Client: client.crt, client.key"
+echo
+echo "Next steps for AWS ClientVPN:"
+echo "1. Upload ca.crt as Certificate Authority in AWS"
+echo "2. Upload server.crt + server.key as Server Certificate"
+echo "3. Use client.crt + client.key for client authentication"
