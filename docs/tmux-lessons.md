@@ -1,4 +1,40 @@
 # Tmux Lessons Summary
+##
+```bash
+leader + c # create window
+leader + n # next window
+leader + p # previous window
+leader + 0,1,2 # navigate to window number.
+
+leader %  #split windo vertically
+leader "" #split window horisontally
+
+leader : # enter command mode.
+leader : rename-window # enter command mode and rename-window 
+
+leader d #detach from tmux
+
+#sessions
+leader 
+
+
+tmux ls #list all sessions
+tmux attach # attach to last session.
+
+```
+
+> tmux conf lives in ~/.tmux.conf
+
+
+
+
+
+
+## How to configure your tmux-session.
+
+
+
+
 
 ## Copy Mode Basics
 - Enter copy mode: `Ctrl-b [`
