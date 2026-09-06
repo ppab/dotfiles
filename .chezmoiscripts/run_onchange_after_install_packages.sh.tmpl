@@ -1,10 +1,5 @@
 #!/bin/bash
-# packages hash: {{ include "dot_config/mise/mise.toml" | sha256sum }}
-# lockfile hash: {{ include "dot_config/mise/mise.lock" | sha256sum }}
+# packages hash: {{ include "dot_config/mise/config.toml" | sha256sum }}
+$HOME/.local/bin/mise trust $HOME/.config/mise/config.toml && $HOME/.local/bin/mise install
+echo "run on change after install"
 
-set -euo pipefail
-
-MISE_BIN_PATH="{{ if $m := lookPath "mise" }}{{ $m }}{{ else if $l := lookPath (joinPath .chezmoi.homeDir ".local/bin/mise") }}{{ $l }}{{ else }}mise{{ end }}"
-
-$MISE_BIN_PATH trust {{ .chezmoi.homeDir }}/.config/mise
-$MISE_BIN_PATH install
