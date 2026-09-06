@@ -1,5 +1,5 @@
 #!/bin/bash
-echo "setup scripts initialized"
+echo "setup scripts initializing-->>>"
 set -euo pipefail
 
 if command -v chezmoi >/dev/null; then
